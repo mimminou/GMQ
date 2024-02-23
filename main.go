@@ -1,7 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"github.com/mimminou/GMQ/networking"
+)
 
 func main() {
-	fmt.Println("env setup correctly")
+	networking.StartTCPServer(8085)
 }
