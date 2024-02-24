@@ -18,6 +18,9 @@ func StartTCPServer(port int) {
 		return
 	}
 	fmt.Println("Server Listening on port ", port)
+
+	//run the message dispatcher
+	go messaging.MessageDispatcher()
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
@@ -45,7 +48,8 @@ func handleConnection(conn net.Conn) {
 		var msg messaging.Command
 		err = decoder.Decode(&msg)
 		if err != nil {
-			fmt.Printf("Error decoding JSON: %s\n", err)
+			fmt.Fprintf(conn, "Error decoding JSON: %s\n", err)
+			fmt.Printf("JSON DECODE ERR: %s\n", err)
 			return
 		}
 		// we are in the clear, message is guarenteed to be Json
@@ -60,15 +64,62 @@ func handleConnection(conn net.Conn) {
 func handleMethod(msg messaging.Command, conn net.Conn) {
 	switch msg.Method {
 	case "pub":
+		payload, err := extractPayload(msg)
+		if err != nil {
+			fmt.Fprintf(conn, "Error decoding JSON: %s\n", err)
+			return
+		}
 		messaging.PublishMessage(messaging.Payload{
-			ID:         msg.Payload,
-			RoutingKey: msg.RoutingKey,
-			Body:       msg.Payload,
+			ID:         payload.ID,
+			RoutingKey: payload.RoutingKey,
+			Body:       payload.Body,
 			BodyB64:    nil,
 		})
-		break
+		return
 	case "sub":
-		//TODO : handle subbing, ano other functions like Delete queue, unsub and new Queue
-	}
+		payload, err := extractPayload(msg)
+		if err != nil {
+			fmt.Fprintf(conn, "Error decoding JSON: %s\n", err)
+			return
+		}
+		messaging.AddSub(messaging.Client{
+			ConnInfo:   conn,
+			ChannelID:  msg.ChannelID,
+			RoutingKey: payload.RoutingKey,
+			ClientType: msg.Method,
+		})
+	case "unsub":
+		payload, err := extractPayload(msg)
+		if err != nil {
+			fmt.Fprintf(conn, "Error decoding JSON: %s\n", err)
+			return
+		}
+		messaging.RemoveSub(messaging.Client{
+			ConnInfo:   conn,
+			ChannelID:  msg.ChannelID,
+			RoutingKey: payload.RoutingKey,
+			ClientType: msg.Method,
+		})
 
+	case "new":
+		payload, err := extractPayload(msg)
+		if err != nil {
+			fmt.Fprintf(conn, "Error decoding JSON: %s\n", err)
+			return
+		}
+		messaging.NewQueue(payload.RoutingKey)
+		return
+
+	case "del":
+		payload, err := extractPayload(msg)
+		if err != nil {
+			fmt.Fprintf(conn, "Error decoding JSON: %s\n", err)
+			return
+		}
+		messaging.DeleteQueue(payload.RoutingKey)
+	}
+}
+
+func extractPayload(msg messaging.Command) (messaging.Payload, error) {
+	return msg.Msg, nil
 }
