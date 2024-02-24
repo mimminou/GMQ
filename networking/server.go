@@ -20,7 +20,6 @@ func StartTCPServer(port int) {
 	fmt.Println("Server Listening on port ", port)
 
 	//run the message dispatcher
-	go messaging.MessageDispatcher()
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
@@ -52,7 +51,7 @@ func handleConnection(conn net.Conn) {
 			fmt.Printf("JSON DECODE ERR: %s\n", err)
 			return
 		}
-		// we are in the clear, message is guarenteed to be Json
+		// we are in the clear, message is guarenteed to be JSON
 		handleMethod(msg, conn)
 		if msg.Method == "pub" {
 			break
