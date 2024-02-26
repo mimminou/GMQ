@@ -75,6 +75,8 @@ func handleMethod(msg messaging.Command, conn net.Conn) {
 			BodyB64:    nil,
 		})
 		return
+
+	// Need to ignore payload message for all cases under this one, to save a bit of processing power when parsing JSON
 	case "sub":
 		payload, err := extractPayload(msg)
 		if err != nil {
