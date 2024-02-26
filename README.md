@@ -50,7 +50,7 @@ GMQ runs on TCP, it expects inputs to be plain text JSON of this structure:
 
 
 # Idea behind GMQ
-This is a project I have developed to challenge my relatively fresh knowledge of distributed systems, It is not designed to be a full fledged message broker (at least for now), a lot of features are missing, like permissions (anyone can publish / subscribe to any queue), no message persistence (everything is stored in memory), no retries on failure / dead queue managment (I intend to implement this), absolutely 0 logging except for STDOUT to the console.
+This is a project I have developed to challenge my recentlyy acquired knowledge of distributed systems, It is not designed to be a full fledged message broker (at least not for now), a lot of features are missing, like permissions (anyone can publish / subscribe to any queue), no message persistence (everything is stored in memory), no retries on failure / dead queue managment (I intend to implement this), absolutely 0 logging except for STDOUT to the console.
 It is a tool that may help people be introduced to message queue services on a surface level, or for testing in development environments.
 
 # Contributing
