@@ -21,7 +21,7 @@ GMQ runs on TCP, it expects inputs to be plain text JSON of this structure:
 
  ## Structure
 
-#### `method` : possible values : pub / sub / unsub / new / del
+#### `method` : possible values : pub / sub / unsub / new / del / queues
 
 `pub` : publishes the message in the payload into the routingKey queue, if the queue does not exist, it will create it
 
