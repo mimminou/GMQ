@@ -33,6 +33,7 @@ GMQ runs on TCP, it expects inputs to be plain text JSON of this structure:
 
 `del` : deletes a queue, no op if queue does not exist. Will notifiy all subs of the queue of deletion event
 
+`queues` : returns a list of all available queues
 
 #### `chan` : non zero, non negative int, signifies the channel id for multiplexing in TCP
 

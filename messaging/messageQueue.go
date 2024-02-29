@@ -3,6 +3,7 @@ package messaging
 import (
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 )
 
@@ -71,7 +72,7 @@ func SendMessage(conn net.Conn, msg Payload) {
 	fmt.Fprintf(conn, "%s\n", msg.Body)
 }
 
-// Creates a new queue of messages with a specified capacity, returns a pointer to it, a new Queue is only created if a sub tries to subscribe to a queue that does not exist
+// Creates a new queue of messages with a specified capacity, returns a pointer to it or to the queue of the same name if it exists already. A new queue is only created if a publisher tries to publish to a queue that does not exist
 func NewQueue(name string) (*Queue, error) {
 	queueNames.mux.Lock()
 	defer queueNames.mux.Unlock()
@@ -87,6 +88,7 @@ func NewQueue(name string) (*Queue, error) {
 	if value, ok := queueNames.data[name]; ok {
 		return value, nil
 	} else {
+		// queue does not exist, create it
 		queueNames.data[name] = &Queue{Name: name, Messages: make(chan Payload, 50), Subs: make([]Client, 0, 10)}
 		go MessageDispatcher(queueNames.data[name])
 		return queueNames.data[name], nil
@@ -108,7 +110,7 @@ func getAllQueues() []string {
 	//print all existing queues
 	queueNames.mux.Lock()
 	defer queueNames.mux.Unlock()
-	queueList := make([]string, len(queueNames.data))
+	queueList := make([]string, 0)
 	for key := range queueNames.data {
 		queueList = append(queueList, key)
 	}
@@ -119,28 +121,24 @@ func getAllQueues() []string {
 func SendAllQueues(conn net.Conn) {
 	//send all existing queues to the client
 	queueList := getAllQueues()
-	SendMessage(conn, Payload{Body: fmt.Sprintf("%v", queueList)})
+	queueListString := strings.Join(queueList, ", ")
+	SendMessage(conn, Payload{Body: fmt.Sprintf("%v", queueListString)})
 }
 
 // Deletes a message Queue, "should" notify all subscribers that the queue is pending deletion, then deletes it
 func DeleteQueue(name string) {
-	// TODO : implement message notification, or rather sending messages to subscribers in order for notifications to work
 	fmt.Println("Delete request received")
 	queueNames.mux.Lock()
 	defer queueNames.mux.Unlock()
 
-	//TODO : notify subs
+	//TODO : notify subs about queue deletion before this
 	delete(queueNames.data, name)
 }
 
 // Appends a message to a queue, will create the queue if it's non existent
 func PublishMessage(m Payload) {
 	fmt.Println("Publish request received")
-	if q, exists := GetQueue(m.RoutingKey); exists {
-		q.Enqueue(m)
-		return
-	}
-	// if queue does not exist, create it
+	// newQueue will check if Q exists or not, will return either a ref if it exists, or creates a new one and returns a ref to it
 	q, err := NewQueue(m.RoutingKey)
 	if err != nil {
 		q.Enqueue(m)
@@ -164,7 +162,7 @@ func AddSub(c Client) { // maybe there should be error handling here
 
 // Private function, removes a client from a list of clients, since ordering does NOT matter, this replaces the client that will be removed by the last one and returns a slice of length-1 the original, thus avoiding shifting the slice
 func removeClient(s []Client, index int) []Client {
-	// if only one client, return empty slice with size 10
+	// if only one client, return empty slice with len 0 and capacity 10
 	if len(s) == 1 {
 		return make([]Client, 0, 10)
 	}
