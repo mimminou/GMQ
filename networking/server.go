@@ -53,10 +53,6 @@ func handleConnection(conn net.Conn) {
 		}
 		// we are in the clear, message is guarenteed to be JSON
 		handleMethod(msg, conn)
-		if msg.Method == "pub" {
-			break
-		}
-
 	}
 }
 
@@ -89,6 +85,7 @@ func handleMethod(msg messaging.Command, conn net.Conn) {
 			RoutingKey: payload.RoutingKey,
 			ClientType: msg.Method,
 		})
+
 	case "unsub":
 		payload, err := extractPayload(msg)
 		if err != nil {
@@ -118,6 +115,15 @@ func handleMethod(msg messaging.Command, conn net.Conn) {
 			return
 		}
 		messaging.DeleteQueue(payload.RoutingKey)
+
+	case "queues":
+		_, err := extractPayload(msg)
+		if err != nil {
+			fmt.Fprintf(conn, "Error decoding JSON: %s\n", err)
+			return
+		}
+		messaging.SendAllQueues(conn)
+		return
 	}
 }
 

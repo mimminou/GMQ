@@ -53,15 +53,12 @@ func MessageDispatcher(q *Queue) {
 	for {
 		q.subsLock.Lock()
 		q.subsLock.Unlock()
-		fmt.Println("lenght of subs")
-		fmt.Println(len(q.Subs))
 		msg := q.Dequeue()
 
 		if len(q.Subs) == 0 {
 			continue
 		}
 		for _, sub := range q.Subs {
-			fmt.Println(sub.ClientType)
 			go SendMessage(sub.ConnInfo, msg)
 		}
 	}
@@ -71,11 +68,6 @@ func MessageDispatcher(q *Queue) {
 func SendMessage(conn net.Conn, msg Payload) {
 	// Sending to client
 	fmt.Println("Sending message")
-	if msg.ID == "" {
-		fmt.Fprintf(conn, "%s\n", msg.Body)
-		conn.Close()
-		return
-	}
 	fmt.Fprintf(conn, "%s\n", msg.Body)
 }
 
@@ -105,14 +97,29 @@ func NewQueue(name string) (*Queue, error) {
 func GetQueue(name string) (*Queue, bool) {
 	queueNames.mux.Lock()
 	defer queueNames.mux.Unlock()
-	//print all existing queues
-	for key := range queueNames.data {
-		fmt.Println(key)
-	}
 	if value, ok := queueNames.data[name]; ok {
 		return value, true
 	}
 	return nil, false
+}
+
+// gets all existing queues and returns a slice of their names
+func getAllQueues() []string {
+	//print all existing queues
+	queueNames.mux.Lock()
+	defer queueNames.mux.Unlock()
+	queueList := make([]string, len(queueNames.data))
+	for key := range queueNames.data {
+		queueList = append(queueList, key)
+	}
+	return queueList
+}
+
+// Public function, sends all existing queues to the client
+func SendAllQueues(conn net.Conn) {
+	//send all existing queues to the client
+	queueList := getAllQueues()
+	SendMessage(conn, Payload{Body: fmt.Sprintf("%v", queueList)})
 }
 
 // Deletes a message Queue, "should" notify all subscribers that the queue is pending deletion, then deletes it
@@ -151,28 +158,31 @@ func AddSub(c Client) { // maybe there should be error handling here
 			currentQueue.Subs = append(currentQueue.Subs, c)
 			return
 		}
-		SendMessage(c.ConnInfo, Payload{ID: "", RoutingKey: c.RoutingKey, Body: "Queue does not exist", BodyB64: nil})
+		SendMessage(c.ConnInfo, Payload{ID: "", RoutingKey: c.RoutingKey, Body: "Queue does not exist", BodyB64: nil}) // ID of empty string means queue does not exist
 	}()
 }
 
 // Private function, removes a client from a list of clients, since ordering does NOT matter, this replaces the client that will be removed by the last one and returns a slice of length-1 the original, thus avoiding shifting the slice
 func removeClient(s []Client, index int) []Client {
+	// if only one client, return empty slice with size 10
+	if len(s) == 1 {
+		return make([]Client, 0, 10)
+	}
 	s[index] = s[len(s)-1]
 	return s[:len(s)-1]
 }
 
 // removes Subscribers from the subscriptions map
 func RemoveSub(c Client) {
-	// need a go routine here or else it will block the thread that called this if the pool is full, the thread could be a network connection already so I might remove it
+	// need a go routine here or else it will block the thread that called this if the pool is full
 	fmt.Println("Unsub request received")
 	go func() {
-		// queueClients.mux.Lock()
-		// defer queueClients.mux.Unlock()
 		if currentQueue, exists := GetQueue(c.RoutingKey); exists {
 			currentQueue.subsLock.Lock()
 			defer currentQueue.subsLock.Unlock()
+			//check if client is subbed, iterate thourgh clients list in this particular queue
 			for i, sub := range currentQueue.Subs {
-				if sub == c {
+				if c == sub {
 					currentQueue.Subs = removeClient(currentQueue.Subs, i)
 					break
 				}
@@ -190,7 +200,7 @@ func (q *Queue) Enqueue(m Payload) {
 	}()
 }
 
-// Dequeues and returns a Message and a bool, true if a message was returned from the queue, false if it was empty
+// Dequeues and returns a Message, will block until a message is available
 func (q *Queue) Dequeue() Payload {
 	return <-q.Messages
 }
